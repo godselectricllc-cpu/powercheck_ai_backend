@@ -19,7 +19,11 @@ app.get('/health', (_req, res) => {
 
 app.post('/diagnose', async (req, res) => {
   try {
-    const message = req.body.message;
+    const { message } = req.body || {};
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'message is required.' });
+    }
 
     if (!process.env.OPENAI_API_KEY) {
       return res.status(500).json({ error: 'OPENAI_API_KEY is not configured.' });
@@ -43,10 +47,18 @@ app.post('/diagnose', async (req, res) => {
       return res.status(502).json({ error: 'Model returned an empty response.' });
     }
 
-    res.json({ reply });
+    return res.json({ reply });
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Internal server error.' });
+    console.error('Diagnose error:', error);
+
+    const status = Number(error?.status) || 500;
+    const detail = error?.error?.message || error?.message || 'Unknown server error';
+
+    return res.status(status).json({
+      error: detail,
+      type: error?.error?.type || error?.name || 'ServerError',
+      code: error?.code || error?.error?.code || null,
+    });
   }
 });
 
